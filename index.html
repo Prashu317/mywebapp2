@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+        button {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .charts {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 30px;
+        }
+        canvas {
+            max-width: 350px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Monthly Expense Manager</h2>
+    
+    <label>Filter by Month:</label>
+    <select id="monthFilter" onchange="filterExpenses()">
+        <option value="all">All</option>
+        <option value="01">January</option>
+        <option value="02">February</option>
+        <option value="03">March</option>
+        <option value="04">April</option>
+        <option value="05">May</option>
+        <option value="06">June</option>
+        <option value="07">July</option>
+        <option value="08">August</option>
+        <option value="09">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+    </select>
+
+    <h3>Add Expense</h3>
+    <label>Date:</label>
+    <input type="date" id="expenseDate">
+    
+    <label>Category:</label>
+    <select id="expenseCategory">
+        <option value="Room Rent">Room Rent</option>
+        <option value="Groceries">Groceries</option>
+        <option value="School Fees">School Fees</option>
+        <option value="Tuition Fees">Tuition Fees</option>
+        <option value="College Fees">College Fees</option>
+        <option value="Loan EMI's">Loan EMI's</option>
+        <option value="Travelling">Travelling</option>
+        <option value="others">others</ption>
+    </select>
+
+    <label>Amount (₹):</label>
+    <input type="number" id="expenseAmount">
+
+    <button onclick="addExpense()">Add Expense</button>
+
+    <h3>Total Expenses: ₹<span id="totalExpenses">0</span></h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Amount (₹)</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="expenseTable"></tbody>
+    </table>
+
+    <div class="charts">
+        <canvas id="pieChart"></canvas>
+        <canvas id="barChart"></canvas>
+    </div>
+</div>
+
+<script>
+    let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+
+    function addExpense() {
+        let date = document.getElementById("expenseDate").value;
+        let category = document.getElementById("expenseCategory").value;
+        let amount = parseFloat(document.getElementById("expenseAmount").value);
+
+        if (date && category && amount) {
+            expenses.push({ date, category, amount });
+            localStorage.setItem("expenses", JSON.stringify(expenses));
+            displayExpenses();
+        }
+    }
+
+    function displayExpenses() {
+        let table = document.getElementById("expenseTable");
+        table.innerHTML = "";
+        let total = 0;
+        expenses.forEach((expense, index) => {
+            total += expense.amount;
+            let row = `<tr>
+                <td>${expense.date}</td>
+                <td>${expense.category}</td>
+                <td>₹${expense.amount}</td>
+                <td>
+                    <button onclick="editExpense(${index})">Edit</button>
+                    <button onclick="deleteExpense(${index})">Delete</button>
+                </td>
+            </tr>`;
+            table.innerHTML += row;
+        });
+        document.getElementById("totalExpenses").textContent = total;
+        renderCharts();
+    }
+
+    function editExpense(index) {
+        let expense = expenses[index];
+        document.getElementById("expenseDate").value = expense.date;
+        document.getElementById("expenseCategory").value = expense.category;
+        document.getElementById("expenseAmount").value = expense.amount;
+        deleteExpense(index);
+    }
+
+    function deleteExpense(index) {
+        expenses.splice(index, 1);
+        localStorage.setItem("expenses", JSON.stringify(expenses));
+        displayExpenses();
+    }
+
+    function filterExpenses() {
+        let selectedMonth = document.getElementById("monthFilter").value;
+        let filteredExpenses = expenses.filter(exp => selectedMonth === "all" || exp.date.split("-")[1] === selectedMonth);
+        
+        let table = document.getElementById("expenseTable");
+        table.innerHTML = "";
+        let total = 0;
+        filteredExpenses.forEach((expense, index) => {
+            total += expense.amount;
+            let row = `<tr>
+                <td>${expense.date}</td>
+                <td>${expense.category}</td>
+                <td>₹${expense.amount}</td>
+                <td>
+                    <button onclick="editExpense(${index})">Edit</button>
+                    <button onclick="deleteExpense(${index})">Delete</button>
+                </td>
+            </tr>`;
+            table.innerHTML += row;
+        });
+        document.getElementById("totalExpenses").textContent = total;
+        renderCharts();
+    }
+
+    function renderCharts() {
+        let categories = {};
+        expenses.forEach(exp => {
+            categories[exp.category] = (categories[exp.category] || 0) + exp.amount;
+        });
+        let labels = Object.keys(categories);
+        let data = Object.values(categories);
+
+        let pieCtx = document.getElementById("pieChart").getContext("2d");
+        new Chart(pieCtx, { type: "pie", data: { labels, datasets: [{ data, backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56"] }] } });
+
+        let barCtx = document.getElementById("barChart").getContext("2d");
+        new Chart(barCtx, { type: "bar", data: { labels, datasets: [{ label: "Expenses (₹)", data, backgroundColor: "#36A2EB" }] } });
+    }
+
+    document.addEventListener("DOMContentLoaded", displayExpenses);
+</script>
+
+</body>
+</html>
